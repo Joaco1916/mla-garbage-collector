@@ -11,7 +11,7 @@ public class GarbageCollectorSettings : MonoBehaviour
     [HideInInspector]
     public GarbageCollectorArea[] listArea;
 
-    public int totalScore;
+    public float totalScore;
     //public Text scoreText;
 
     StatsRecorder m_Recorder;

@@ -56,6 +56,17 @@ public class GarbageCollectorAgent : Agent
         m_Paper = false;
         m_Charged = false;
         gameObject.GetComponentInChildren<Renderer>().material = normalMaterial;
+        
+        float distanceToPaperBucket = Vector3.Distance(this.transform.localPosition, paperBucket.transform.localPosition);
+        if( distanceToPaperBucket < 6f ){
+            AddReward(1f);
+            m_GarbageCollectorSettings.totalScore += 1f;
+        } else {
+            AddReward(-1f);
+            m_GarbageCollectorSettings.totalScore -= 1f;
+        }
+
+        EndEpisode();
     }
 
     //Plastic
@@ -70,6 +81,17 @@ public class GarbageCollectorAgent : Agent
         m_Plastic = false;
         m_Charged = false;
         gameObject.GetComponentInChildren<Renderer>().material = normalMaterial;
+
+        float distanceToPlasticBucket = Vector3.Distance(this.transform.localPosition, plasticBucket.transform.localPosition);
+        if( distanceToPlasticBucket < 6f ){
+            AddReward(1f);
+            m_GarbageCollectorSettings.totalScore += 1f;
+        } else {
+            AddReward(-1f);
+            m_GarbageCollectorSettings.totalScore -= 1f;
+        }
+        
+        EndEpisode();
     }
 
     //Glass
@@ -84,21 +106,30 @@ public class GarbageCollectorAgent : Agent
         m_Glass = false;
         m_Charged = false;
         gameObject.GetComponentInChildren<Renderer>().material = normalMaterial;
+
+        float distanceToGlassBucket = Vector3.Distance(this.transform.localPosition, glassBucket.transform.localPosition);
+        if( distanceToGlassBucket < 6f ){
+            AddReward(1f);
+            m_GarbageCollectorSettings.totalScore += 1f;
+        } else {
+            AddReward(-1f);
+            m_GarbageCollectorSettings.totalScore -= 1f;
+        }
+        
+        EndEpisode();
     }
 
     public override void OnEpisodeBegin()
     {
-       // If the Agent fell, zero its momentum
+        // If the Agent fell, zero its momentum
         if (this.transform.localPosition.y < 0)
         {
             this.rBody.angularVelocity = Vector3.zero;
             this.rBody.velocity = Vector3.zero;
             this.transform.localPosition = new Vector3( 0, 0.5f, 0);
-
-            AddReward(-50f);
+            AddReward(-1f);
         }
 
-        print("OnEpisodeBegin reward: " + GetCumulativeReward());    
     }
 
     public override void CollectObservations(VectorSensor sensor)
@@ -122,6 +153,47 @@ public class GarbageCollectorAgent : Agent
         sensor.AddObservation(Vector3.Distance(this.transform.localPosition, paperBucket.transform.localPosition));
         sensor.AddObservation(Vector3.Distance(this.transform.localPosition, plasticBucket.transform.localPosition));
         sensor.AddObservation(Vector3.Distance(this.transform.localPosition, glassBucket.transform.localPosition));
+
+        // Distance to closest garbage
+        sensor.AddObservation(ClosestGarbage());
+    }
+
+    public float ClosestGarbage()
+    {
+        GameObject[] paperGarbage = GameObject.FindGameObjectsWithTag("paper");
+        GameObject[] plasticGarbage = GameObject.FindGameObjectsWithTag("plastic");
+        GameObject[] glassGarbage = GameObject.FindGameObjectsWithTag("glass");
+
+        float distanceToClosestGarbage = float.MaxValue;
+
+        foreach (GameObject paper in paperGarbage)
+        {
+            float distanceToPaper = Vector3.Distance(this.transform.localPosition, paper.transform.localPosition);
+            if (distanceToPaper < distanceToClosestGarbage)
+            {
+                distanceToClosestGarbage = distanceToPaper;
+            }
+        }
+
+        foreach (GameObject plastic in plasticGarbage)
+        {
+            float distanceToPlastic = Vector3.Distance(this.transform.localPosition, plastic.transform.localPosition);
+            if (distanceToPlastic < distanceToClosestGarbage)
+            {
+                distanceToClosestGarbage = distanceToPlastic;
+            }
+        }
+
+        foreach (GameObject glass in glassGarbage)
+        {
+            float distanceToGlass = Vector3.Distance(this.transform.localPosition, glass.transform.localPosition);
+            if (distanceToGlass < distanceToClosestGarbage)
+            {
+                distanceToClosestGarbage = distanceToGlass;
+            }
+        }
+        
+        return distanceToClosestGarbage;
     }
 
     public Color32 ToColor(int hexVal)
@@ -138,6 +210,7 @@ public class GarbageCollectorAgent : Agent
         var rotateDir = Vector3.zero;
 
         var continuousActions = actionBuffers.ContinuousActions;
+        var discreteActions = actionBuffers.DiscreteActions;
 
         var forward = Mathf.Clamp(continuousActions[0], -1f, 1f);
         var right = Mathf.Clamp(continuousActions[1], -1f, 1f);
@@ -150,6 +223,26 @@ public class GarbageCollectorAgent : Agent
         rBody.AddForce(dirToGo * moveSpeed, ForceMode.VelocityChange);
         transform.Rotate(rotateDir, Time.fixedDeltaTime * turnSpeed);
 
+        if( m_Charged ){
+            float distanceToPaperBucket = Vector3.Distance(this.transform.localPosition, paperBucket.transform.localPosition);
+            float distanceToPlasticBucket = Vector3.Distance(this.transform.localPosition, plasticBucket.transform.localPosition);
+            float distanceToGlassBucket = Vector3.Distance(this.transform.localPosition, glassBucket.transform.localPosition);
+
+            var releaseCommand = discreteActions[0] > 0;
+            if (releaseCommand && (distanceToPaperBucket < 6f || distanceToPlasticBucket < 6f || distanceToGlassBucket < 6f))
+            {
+                if( m_Paper ){
+                    ReleasePaper();
+                }
+                if( m_Plastic ){
+                    ReleasePlastic();
+                }
+                if( m_Glass ){
+                    ReleaseGlass();
+                }
+            }
+        }
+
         // Reduce the velocity when get to a limit of 20f
         if (rBody.velocity.sqrMagnitude > 20f)
         {
@@ -157,7 +250,7 @@ public class GarbageCollectorAgent : Agent
         }
 
         // Time penalty
-        AddReward(-0.05f);
+        AddReward(-0.001f);
     }
 
     void OnCollisionEnter(Collision collision)
@@ -165,8 +258,8 @@ public class GarbageCollectorAgent : Agent
         //Colisión con pared
         if (collision.gameObject.CompareTag("wall"))
         {
-            AddReward(-1f);
-            m_GarbageCollectorSettings.totalScore -= 1;
+            AddReward(-0.01f);
+            m_GarbageCollectorSettings.totalScore -= 0.01f;
         }
 
         //Colisión con papel
@@ -175,13 +268,14 @@ public class GarbageCollectorAgent : Agent
             if( !m_Charged ){
                 PickUpPaper();
                 collision.gameObject.GetComponent<GarbageLogic>().OnCollected();
-                AddReward(100f);
-                m_GarbageCollectorSettings.totalScore += 100;
+                AddReward(0.5f);
+                m_GarbageCollectorSettings.totalScore += 0.5f;
             } else {
-                AddReward(-1f);
-                m_GarbageCollectorSettings.totalScore -= 1;
+                AddReward(-0.01f);
+                m_GarbageCollectorSettings.totalScore -= 0.01f;
             }
         }
+        /*
         if (collision.gameObject.CompareTag("paperBucket"))
         {
             if( m_Paper ){
@@ -194,6 +288,7 @@ public class GarbageCollectorAgent : Agent
                 m_GarbageCollectorSettings.totalScore -= 1;
             }
         }
+        */
 
         //Colisión con plástico
         if (collision.gameObject.CompareTag("plastic"))
@@ -201,13 +296,15 @@ public class GarbageCollectorAgent : Agent
             if( !m_Charged ){
                 PickUpPlastic();
                 collision.gameObject.GetComponent<GarbageLogic>().OnCollected();
-                AddReward(100f);
-                m_GarbageCollectorSettings.totalScore += 100;
+                AddReward(0.5f);
+                m_GarbageCollectorSettings.totalScore += 0.5f;
             } else {
-                AddReward(-1f);
-                m_GarbageCollectorSettings.totalScore -= 1;
+                AddReward(-0.01f);
+                m_GarbageCollectorSettings.totalScore -= 0.01f;
             }
         }
+
+        /*
         if (collision.gameObject.CompareTag("plasticBucket"))
         {
             if( m_Plastic ){
@@ -220,6 +317,7 @@ public class GarbageCollectorAgent : Agent
                 m_GarbageCollectorSettings.totalScore -= 1;
             }
         }
+        */
 
         //Colisión con vidrio
         if (collision.gameObject.CompareTag("glass"))
@@ -227,13 +325,15 @@ public class GarbageCollectorAgent : Agent
             if( !m_Charged ){
                 PickUpGlass();
                 collision.gameObject.GetComponent<GarbageLogic>().OnCollected();
-                AddReward(100f);
-                m_GarbageCollectorSettings.totalScore += 100;
+                AddReward(0.5f);
+                m_GarbageCollectorSettings.totalScore += 0.5f;
             } else {
-                AddReward(-1f);
-                m_GarbageCollectorSettings.totalScore -= 1;
+                AddReward(-0.01f);
+                m_GarbageCollectorSettings.totalScore -= 0.01f;
             }
         }
+
+        /*
         if (collision.gameObject.CompareTag("glassBucket"))
         {
             if( m_Glass ){
@@ -246,6 +346,7 @@ public class GarbageCollectorAgent : Agent
                 m_GarbageCollectorSettings.totalScore -= 1;
             }
         }
+        */
     }
 
     public override void Heuristic(in ActionBuffers actionsOut)
@@ -267,5 +368,7 @@ public class GarbageCollectorAgent : Agent
         {
             continuousActionsOut[0] = -1;
         }
+        var discreteActionsOut = actionsOut.DiscreteActions;
+        discreteActionsOut[0] = Input.GetKey(KeyCode.Space) ? 1 : 0;
     }
 }
