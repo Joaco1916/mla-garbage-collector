@@ -5,7 +5,7 @@ behaviors:
       batch_size: 2048
       buffer_size: 20480
       learning_rate: 2.0e-4
-      beta: 3.0e-3
+      beta: 3.0e-3 #exploring rate
       epsilon: 0.15
       lambd: 0.93
       num_epoch: 3
@@ -19,8 +19,9 @@ behaviors:
       vis_encode_type: simple
     reward_signals:
       extrinsic:
-        gamma: 0.99
+        gamma: 0.995 #prepare for rewards in the distant future
         strength: 1.0
     max_steps: 30000000
-    time_horizon: 1000
+    time_horizon: 1024
     summary_freq: 50000
+    threaded: true
