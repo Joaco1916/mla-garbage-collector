@@ -2,26 +2,26 @@ behaviors:
   GarbageCollector:
     trainer_type: ppo
     hyperparameters:
-      batch_size: 2048
-      buffer_size: 20480
-      learning_rate: 2.0e-4
-      beta: 3.0e-3 #exploring rate
-      epsilon: 0.15
+      batch_size: 4096
+      buffer_size: 40960
+      learning_rate: 1.0e-4 #This should typically be decreased if training is unstable, and the reward does not consistently increase.
+      beta: 3.0e-3 #Exploring rate - entropy slowly decreases alongside increases in reward, if entropy drops too slowly, decrease beta.
+      epsilon: 0.2 #The clipping parameter, this is the maximum change in the probability ratio.
       lambd: 0.93
-      num_epoch: 3
+      num_epoch: 5
       learning_rate_schedule: linear
       beta_schedule: constant
       epsilon_schedule: linear
     network_settings:
       normalize: false
-      hidden_units: 256
+      hidden_units: 256 #The action is a very complex interaction between the observation variables
       num_layers: 2
       vis_encode_type: simple
     reward_signals:
       extrinsic:
-        gamma: 0.995 #prepare for rewards in the distant future
+        gamma: 0.99 #Prepare for rewards in the distant future
         strength: 1.0
-    max_steps: 30000000
+    max_steps: 100000000
     time_horizon: 1024
     summary_freq: 50000
     threaded: true
