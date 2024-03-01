@@ -17,6 +17,7 @@ public class GarbageCollectorAgent : Agent
     bool m_Plastic;
     bool m_Glass;
     bool m_Charged;
+    float range = 40;
 
     // Speed of agent rotation.
     public float turnSpeed = 150;
@@ -121,15 +122,19 @@ public class GarbageCollectorAgent : Agent
 
     public override void OnEpisodeBegin()
     {
-        // If the Agent fell, zero its momentum
-        if (this.transform.localPosition.y < 0)
-        {
+        if (this.transform.localPosition.y < 0){
+            // Reset the agent position
             this.rBody.angularVelocity = Vector3.zero;
             this.rBody.velocity = Vector3.zero;
-            this.transform.localPosition = new Vector3( 0, 0.5f, 0);
-            AddReward(-1f);
-        }
+            this.transform.localPosition = new Vector3( Random.Range(-range, range), 0.5f, Random.Range(-range, range) );
 
+            //Also reset the garbage
+            m_Paper = false;
+            m_Plastic = false;
+            m_Glass = false;
+            m_Charged = false;
+            gameObject.GetComponentInChildren<Renderer>().material = normalMaterial;
+        }
     }
 
     public override void CollectObservations(VectorSensor sensor)
@@ -275,20 +280,6 @@ public class GarbageCollectorAgent : Agent
                 m_GarbageCollectorSettings.totalScore -= 0.01f;
             }
         }
-        /*
-        if (collision.gameObject.CompareTag("paperBucket"))
-        {
-            if( m_Paper ){
-                ReleasePaper();
-                AddReward(500f);
-                m_GarbageCollectorSettings.totalScore += 500;
-                EndEpisode();
-            } else {
-                AddReward(-1f);
-                m_GarbageCollectorSettings.totalScore -= 1;
-            }
-        }
-        */
 
         //Colisión con plástico
         if (collision.gameObject.CompareTag("plastic"))
@@ -304,21 +295,6 @@ public class GarbageCollectorAgent : Agent
             }
         }
 
-        /*
-        if (collision.gameObject.CompareTag("plasticBucket"))
-        {
-            if( m_Plastic ){
-                ReleasePlastic();
-                AddReward(500f);
-                m_GarbageCollectorSettings.totalScore += 500;
-                EndEpisode();
-            } else {
-                AddReward(-1f);
-                m_GarbageCollectorSettings.totalScore -= 1;
-            }
-        }
-        */
-
         //Colisión con vidrio
         if (collision.gameObject.CompareTag("glass"))
         {
@@ -332,21 +308,6 @@ public class GarbageCollectorAgent : Agent
                 m_GarbageCollectorSettings.totalScore -= 0.01f;
             }
         }
-
-        /*
-        if (collision.gameObject.CompareTag("glassBucket"))
-        {
-            if( m_Glass ){
-                ReleaseGlass();
-                AddReward(500f);
-                m_GarbageCollectorSettings.totalScore += 500;
-                EndEpisode();
-            } else {
-                AddReward(-1f);
-                m_GarbageCollectorSettings.totalScore -= 1;
-            }
-        }
-        */
     }
 
     public override void Heuristic(in ActionBuffers actionsOut)
